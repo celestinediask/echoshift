@@ -54,16 +54,21 @@ def transcribe_file(file_path):
         # Use Gemini 2.5 Flash - standard for high-speed transcription in 2026
         model = genai.GenerativeModel("models/gemini-2.5-flash")
         
-        response = model.generate_content(
-            [file, "Please provide a high-accuracy, verbatim transcription of this audio. Include timestamps if possible."]
+        # Prompt for SRT subtitle format
+        prompt = (
+            "Please provide a high-accuracy, verbatim transcription of this audio in SubRip Subtitle (SRT) format. "
+            "Ensure the output follows the standard SRT structure: "
+            "1\n00:00:00,000 --> 00:00:00,000\nText here\n\n2\n00:00:00,000 --> 00:00:00,000\nNext text here..."
         )
         
-        # Save the transcription
-        output_path = file_path.with_suffix(".txt")
+        response = model.generate_content([file, prompt])
+        
+        # Save the transcription as .srt
+        output_path = file_path.with_suffix(".srt")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(response.text)
         
-        print(f"Success! Transcription saved to: {output_path}")
+        print(f"Success! SRT subtitle saved to: {output_path}")
         
         # Clean up Gemini file
         genai.delete_file(file.name)
