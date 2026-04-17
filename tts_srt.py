@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import asyncio
+import sys
 import edge_tts
 from pathlib import Path
 from dotenv import load_dotenv
@@ -40,9 +41,8 @@ def parse_srt(file_path):
                 })
     return subtitles
 
-async def generate_tts_audio(text, output_path, voice="ml-IN-SobhanaNeural"):
-    """Use Edge TTS to generate high-quality Malayalam audio."""
-    print(f"Generating audio for: '{text[:30]}...'")
+async def generate_tts_audio(text, output_path, voice):
+    """Use Edge TTS to generate high-quality audio."""
     try:
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(output_path)
@@ -51,9 +51,9 @@ async def generate_tts_audio(text, output_path, voice="ml-IN-SobhanaNeural"):
         print(f"Error generating TTS for '{text[:20]}': {e}")
         return False
 
-async def assemble_audio(subtitles, output_file, temp_dir):
+async def assemble_audio(subtitles, output_file, temp_dir, voice):
     """Stitch audio segments together with silent gaps using FFmpeg."""
-    print("Assembling final audio...")
+    print(f"Assembling final audio using voice: {voice}...")
     
     inputs = []
     filter_complex = ""
@@ -62,12 +62,14 @@ async def assemble_audio(subtitles, output_file, temp_dir):
     # Generate audio segments
     for i, sub in enumerate(subtitles):
         audio_file = temp_dir / f"seg_{i}.mp3"
-        if await generate_tts_audio(sub['text'], audio_file):
+        if await generate_tts_audio(sub['text'], audio_file, voice=voice):
             inputs.append(f"-i \"{audio_file}\"")
             delay_ms = int(sub['start'] * 1000)
             filter_complex += f"[{valid_count}:a]adelay={delay_ms}|{delay_ms}[a{valid_count}];"
             valid_count += 1
+        print(".", end="", flush=True)
     
+    print("\nMixing tracks...")
     if valid_count == 0:
         print("No audio segments were generated.")
         return
@@ -88,29 +90,54 @@ async def assemble_audio(subtitles, output_file, temp_dir):
         print(f"Error assembling audio: {e}")
 
 async def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in ["source", "target"]:
+        print("Usage: python tts_srt.py [source|target]")
+        print("  source: Use the original English SRT")
+        print("  target: Use the translated Malayalam (.ml.srt) SRT")
+        return
+
+    mode = sys.argv[1]
     downloads_dir = Path("downloads")
-    srt_files = [f for f in downloads_dir.iterdir() if f.name.endswith(".ml.srt") and f.is_file()]
     
+    if mode == "target":
+        srt_files = [f for f in downloads_dir.iterdir() if f.name.endswith(".ml.srt") and f.is_file()]
+        voice = "ml-IN-SobhanaNeural"
+        output_suffix = ".ml_audio.mp3"
+    else:
+        # source: find files ending in .srt but NOT .ml.srt
+        srt_files = [
+            f for f in downloads_dir.iterdir() 
+            if f.suffix.lower() == ".srt" and not f.name.endswith(".ml.srt") and f.is_file()
+        ]
+        voice = "en-US-GuyNeural"
+        output_suffix = ".en_audio.mp3"
+
     if not srt_files:
-        print("No Malayalam (.ml.srt) files found in 'downloads/'.")
+        print(f"No {mode} SRT files found in 'downloads/'.")
         return
     
+    if len(srt_files) > 1:
+        print(f"Safety Alert: Found {len(srt_files)} {mode} SRT files. Please keep only ONE in 'downloads/'.")
+        return
+
     srt_path = srt_files[0]
-    output_audio = srt_path.with_suffix(".mp3").name.replace(".ml.mp3", ".ml_audio.mp3")
-    output_path = downloads_dir / output_audio
+    # Name the output audio based on the original base name
+    output_name = srt_path.name.replace(".ml.srt", "").replace(".srt", "") + output_suffix
+    output_path = downloads_dir / output_name
     
     temp_dir = Path("temp_audio_segments")
     temp_dir.mkdir(exist_ok=True)
     
     try:
         subtitles = parse_srt(srt_path)
-        print(f"Found {len(subtitles)} subtitle segments.")
-        await assemble_audio(subtitles, output_path, temp_dir)
+        print(f"Found {len(subtitles)} subtitle segments for {mode} audio.")
+        await assemble_audio(subtitles, output_path, temp_dir, voice=voice)
     finally:
         # Cleanup
         for f in temp_dir.iterdir():
             f.unlink()
-        temp_dir.rmdir()
+        if temp_dir.exists():
+            temp_dir.rmdir()
 
 if __name__ == "__main__":
     asyncio.run(main())
