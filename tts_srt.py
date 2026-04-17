@@ -74,9 +74,9 @@ async def assemble_audio(subtitles, output_file, temp_dir, voice):
         print("No audio segments were generated.")
         return
 
-    # Mix all streams
+    # Mix all streams without normalizing/lowering volume
     mix_str = "".join([f"[a{i}]" for i in range(valid_count)])
-    filter_complex += f"{mix_str}amix=inputs={valid_count}:duration=longest[out]"
+    filter_complex += f"{mix_str}amix=inputs={valid_count}:duration=longest:dropout_transition=0:normalize=0[out]"
     
     # Full FFmpeg command
     input_str = " ".join(inputs)
