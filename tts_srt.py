@@ -101,7 +101,14 @@ async def main():
     
     if mode == "target":
         srt_files = [f for f in downloads_dir.iterdir() if f.name.endswith(".ml.srt") and f.is_file()]
-        voice = "ml-IN-SobhanaNeural"
+        voice = "ml-IN-SobhanaNeural" # Default fallback
+        # Check for detected gender
+        gender_file = downloads_dir / "gender.txt"
+        if gender_file.exists():
+            with open(gender_file, "r") as f:
+                detected_gender = f.read().strip()
+                if detected_gender == "MALE":
+                    voice = "ml-IN-MidhunNeural"
         output_suffix = ".ml_audio.mp3"
     else:
         # source: find files ending in .srt but NOT .ml.srt
@@ -109,7 +116,14 @@ async def main():
             f for f in downloads_dir.iterdir() 
             if f.suffix.lower() == ".srt" and not f.name.endswith(".ml.srt") and f.is_file()
         ]
-        voice = "en-US-GuyNeural"
+        voice = "en-US-GuyNeural" # Default fallback
+        # Check for detected gender
+        gender_file = downloads_dir / "gender.txt"
+        if gender_file.exists():
+            with open(gender_file, "r") as f:
+                detected_gender = f.read().strip()
+                if detected_gender == "FEMALE":
+                    voice = "en-US-JennyNeural"
         output_suffix = ".en_audio.mp3"
 
     if not srt_files:

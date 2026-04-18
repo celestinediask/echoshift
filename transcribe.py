@@ -56,17 +56,38 @@ def transcribe_file(file_path):
         
         # Prompt for SRT subtitle format
         prompt = (
-            "Please provide a high-accuracy, verbatim transcription of this audio in SubRip Subtitle (SRT) format. "
+            "Listen to this audio. First, determine if the primary speaker is male or female. "
+            "Write exactly 'GENDER: MALE' or 'GENDER: FEMALE' on the very first line. "
+            "Then, starting on the next line, provide a high-accuracy, verbatim transcription of this audio in SubRip Subtitle (SRT) format. "
             "Ensure the output follows the standard SRT structure: "
-            "1\n00:00:00,000 --> 00:00:00,000\nText here\n\n2\n00:00:00,000 --> 00:00:00,000\nNext text here..."
+            "1\n00:00:00,000 --> 00:00:00,000\nText here..."
         )
         
         response = model.generate_content([file, prompt])
         
+        # Parse gender and SRT
+        text = response.text.strip()
+        lines = text.split("\n")
+        gender = "MALE"  # Default
+        if lines and lines[0].strip().startswith("GENDER:"):
+            gender_line = lines[0].strip()
+            if "FEMALE" in gender_line.upper():
+                gender = "FEMALE"
+            srt_content = "\n".join(lines[1:]).strip()
+        else:
+            srt_content = text
+            
+        downloads_dir = Path("downloads")
+        downloads_dir.mkdir(exist_ok=True)
+        with open(downloads_dir / "gender.txt", "w") as f:
+            f.write(gender)
+            
+        print(f"Detected Gender: {gender}")
+
         # Save the transcription as .srt
         output_path = file_path.with_suffix(".srt")
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write(response.text)
+            f.write(srt_content)
         
         print(f"Success! SRT subtitle saved to: {output_path}")
         
@@ -86,7 +107,7 @@ def main():
         return
 
     # Supported extensions
-    extensions = {".webm", ".mp3", ".wav", ".m4a", ".flac"}
+    extensions = {".webm", ".mp3", ".wav", ".m4a", ".flac", ".mp4"}
     
     files_to_process = [
         f for f in downloads_dir.iterdir() 
