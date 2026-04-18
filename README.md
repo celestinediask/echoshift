@@ -18,7 +18,7 @@ EchoShift is a multimedia processing pipeline designed to handle the end-to-end 
 
 ## Current Progress
 - [x] Initial Project Setup
-- [x] Secure API Key Management (OpenRouter Integration)
+- [x] Secure API Key Management (Gemini Integration)
 - [ ] YouTube Downloader Module
 - [ ] Video-to-Audio Extraction Module
 - [ ] Transcription Module
@@ -28,7 +28,7 @@ EchoShift is a multimedia processing pipeline designed to handle the end-to-end 
 ## Prerequisites
 - Python 3.x
 - FFmpeg (for media processing)
-- OpenRouter API Key (for LLM-based tasks)
+- Gemini API Key (for LLM-based tasks)
 
 ## Setup
 
@@ -43,7 +43,7 @@ EchoShift is a multimedia processing pipeline designed to handle the end-to-end 
    ```bash
    cp .env.example .env
    ```
-   Add your `OPENROUTER_API_KEY` to the `.env` file to enable translation and advanced processing features.
+   Add your `GEMINI_API_KEY` to the `.env` file to enable translation and advanced processing features.
 
 ## Usage
 *(Modules are currently under development. Detailed usage instructions for each pipeline stage will be added as they are implemented.)*
