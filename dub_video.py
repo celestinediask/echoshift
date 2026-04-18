@@ -12,7 +12,7 @@ def merge_audio_video(video_path, audio_path, output_path):
     # Some youtube-dl downloads split them.
     cmd = [
         "ffmpeg", "-i", str(video_path), "-i", str(audio_path),
-        "-filter_complex", "[0:a]volume=0.15[orig];[orig][1:a]amix=inputs=2:duration=longest:dropout_transition=0[a]",
+        "-filter_complex", "[0:a]pan=stereo|c0=c0-c1|c1=c0-c1,volume=0.25[bgm];[bgm][1:a]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 3[a]",
         "-map", "0:v:0", "-map", "[a]",
         "-c:v", "copy", "-c:a", "aac",
         "-shortest", "-y", str(output_path)
