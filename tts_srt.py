@@ -21,24 +21,23 @@ def parse_srt(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read().strip()
     
-    # Simple regex to split SRT blocks
-    blocks = re.split(r'\n\s*\n', content)
-    subtitles = []
+    # Clean up common Gemini timestamp hallucinations (e.g. 01:09:695 instead of 00:01:09,695)
+    content = re.sub(r"\b(\d{2}):(\d{2}):(\d{3})\b", r"00:\1:\2,\3", content)
     
-    for block in blocks:
-        lines = block.split("\n")
-        if len(lines) >= 3:
-            # Lines[0] is index, Lines[1] is timestamps, Lines[2:] is text
-            time_match = re.match(r"(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})", lines[1])
-            if time_match:
-                start_time = srt_time_to_seconds(time_match.group(1))
-                end_time = srt_time_to_seconds(time_match.group(2))
-                text = " ".join(lines[2:]).strip()
-                subtitles.append({
-                    "start": start_time,
-                    "end": end_time,
-                    "text": text
-                })
+    # Use robust regex to find all timestamp boundaries regardless of missing blank lines
+    pattern = re.compile(r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})\n(.*?)(?=\n\d+\n\d{2}:\d{2}:\d{2},\d{3}|\Z)", re.DOTALL)
+    
+    subtitles = []
+    for match in pattern.finditer(content):
+        start_time = srt_time_to_seconds(match.group(1))
+        end_time = srt_time_to_seconds(match.group(2))
+        text = re.sub(r'\s+', ' ', match.group(3).strip())
+        
+        subtitles.append({
+            "start": start_time,
+            "end": end_time,
+            "text": text
+        })
     return subtitles
 
 async def generate_tts_audio(text, output_path, voice):
