@@ -17,27 +17,62 @@ def srt_time_to_seconds(srt_time):
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
 
 def parse_srt(file_path):
-    """Parse SRT file and return a list of dictionaries with start, end, and text."""
+    """Parse SRT file robustly, handling AI timestamp hallucinations."""
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read().strip()
     
-    # Clean up common Gemini timestamp hallucinations (e.g. 01:09:695 instead of 00:01:09,695)
-    content = re.sub(r"\b(\d{2}):(\d{2}):(\d{3})\b", r"00:\1:\2,\3", content)
-    
-    # Use robust regex to find all timestamp boundaries regardless of missing blank lines
-    pattern = re.compile(r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})\n(.*?)(?=\n\d+\n\d{2}:\d{2}:\d{2},\d{3}|\Z)", re.DOTALL)
-    
     subtitles = []
-    for match in pattern.finditer(content):
-        start_time = srt_time_to_seconds(match.group(1))
-        end_time = srt_time_to_seconds(match.group(2))
-        text = re.sub(r'\s+', ' ', match.group(3).strip())
-        
-        subtitles.append({
-            "start": start_time,
-            "end": end_time,
-            "text": text
-        })
+    lines = content.split('\n')
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if not line:
+            i += 1
+            continue
+            
+        if line.isdigit():
+            if i + 1 < len(lines) and '-->' in lines[i+1]:
+                ts_line = lines[i+1]
+                
+                text_lines = []
+                j = i + 2
+                while j < len(lines):
+                    if lines[j].strip().isdigit():
+                        if j + 1 < len(lines) and '-->' in lines[j+1]:
+                            break
+                    text_lines.append(lines[j].strip())
+                    j += 1
+                
+                text = " ".join([t for t in text_lines if t])
+                
+                parts = ts_line.split('-->')
+                if len(parts) == 2:
+                    start_str = parts[0].strip()
+                    end_str = parts[1].strip()
+                    
+                    def to_seconds(ts):
+                        ts = re.sub(r':(\d{3})$', r',\1', ts)
+                        pts = re.split(r'[:,]', ts)
+                        if len(pts) == 4:
+                            return int(pts[0])*3600 + int(pts[1])*60 + int(pts[2]) + int(pts[3])/1000
+                        elif len(pts) == 3:
+                            return int(pts[0])*60 + int(pts[1]) + int(pts[2])/1000
+                        return 0
+                            
+                    start_sec = to_seconds(start_str)
+                    end_sec = to_seconds(end_str)
+                    
+                    subtitles.append({
+                        "start": start_sec,
+                        "end": end_sec,
+                        "text": text
+                    })
+                i = j
+            else:
+                i += 1
+        else:
+            i += 1
+            
     return subtitles
 
 async def generate_tts_audio(text, output_path, voice):
