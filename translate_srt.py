@@ -25,11 +25,13 @@ def translate_srt(file_path, target_lang="Malayalam"):
     
     # Prompt for translation while preserving SRT structure
     prompt = (
-        f"You are a professional translator. Translate the following SRT subtitle text into {target_lang}. "
-        "CRITICAL: Keep all timestamps, indices, and SRT formatting exactly the same. "
-        "Only translate the actual spoken text content. Do not translate indices or timestamps. "
-        "Maintain the line structure. Here is the content:\n\n"
-        f"{srt_content}"
+        f"You are a professional dubbing adapter and translator. Translate the following SRT subtitle text into {target_lang}. "
+        "CRITICAL INSTRUCTIONS: "
+        "1. Keep all timestamps, indices, and SRT formatting exactly the same. Do not translate indices or timestamps. "
+        "2. ADAPTATION: The translated text must take the exact same amount of time to speak out loud as the original English. "
+        f"{target_lang} usually takes longer to say than English. You MUST summarize and adapt the phrasing so it is short, concise, and naturally matches the original lip-sync timing. Avoid overly formal or wordy translations. "
+        "3. Maintain the exact line structure.\n\n"
+        f"Here is the content:\n\n{srt_content}"
     )
     
     try:
