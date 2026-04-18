@@ -85,8 +85,15 @@ async def generate_tts_audio(text, output_path, voice):
         print(f"Error generating TTS for '{text[:20]}': {e}")
         return False
 
+def get_audio_duration(file_path):
+    try:
+        res = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)], capture_output=True, text=True)
+        return float(res.stdout.strip())
+    except:
+        return 0.0
+
 async def assemble_audio(subtitles, output_file, temp_dir, voice):
-    """Stitch audio segments together with silent gaps using FFmpeg."""
+    """Stitch audio segments together with silent gaps using FFmpeg, preventing overlaps."""
     print(f"Assembling final audio using voice: {voice}...")
     
     inputs = []
@@ -98,8 +105,24 @@ async def assemble_audio(subtitles, output_file, temp_dir, voice):
         audio_file = temp_dir / f"seg_{i}.mp3"
         if await generate_tts_audio(sub['text'], audio_file, voice=voice):
             inputs.append(f"-i \"{audio_file}\"")
+            
+            # Calculate allowed duration before next subtitle
+            if i + 1 < len(subtitles):
+                allowed_dur = subtitles[i+1]['start'] - sub['start']
+            else:
+                allowed_dur = sub['end'] - sub['start']
+                
+            allowed_dur = max(allowed_dur - 0.1, 0.5) # small buffer
+            
+            actual_dur = get_audio_duration(audio_file)
             delay_ms = int(sub['start'] * 1000)
-            filter_complex += f"[{valid_count}:a]adelay={delay_ms}|{delay_ms}[a{valid_count}];"
+            
+            if actual_dur > allowed_dur and allowed_dur > 0:
+                ratio = min(actual_dur / allowed_dur, 1.45) # cap speedup at 1.45x
+                filter_complex += f"[{valid_count}:a]atempo={ratio},adelay={delay_ms}|{delay_ms}[a{valid_count}];"
+            else:
+                filter_complex += f"[{valid_count}:a]adelay={delay_ms}|{delay_ms}[a{valid_count}];"
+                
             valid_count += 1
         print(".", end="", flush=True)
     
